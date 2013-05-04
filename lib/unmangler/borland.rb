@@ -918,9 +918,11 @@ class Unmangler::Borland < Unmangler::Base
     # @funcName@<one or more digits indicating size of all parameters>
     return src if src =~ /\A@.*@\d+\Z/
 
-    # Pascal names can not contain lowercase letters
-    if src !~ /[a-z]/
-      # convert uppercase Pascal names to lowercase
+    if src[/[a-z]/]
+      # contains lowercase letters => not Pascal
+      # b/c Pascal names can not contain lowercase letters
+    else
+      # Pascal, convert uppercase Pascal names to lowercase
       src.downcase!
     end
 
