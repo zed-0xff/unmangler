@@ -258,8 +258,7 @@ class Unmangler::MSVC < Unmangler::Base
       when 3
         sym.flags &= ~UNDNAME_NO_FUNCTION_RETURNS
       when 5
-        # ZZZ ???
-        #sym.names.start++
+        sym.names.shift
       end # case do_after
 
       # Function/Data type and access level
@@ -302,7 +301,7 @@ class Unmangler::MSVC < Unmangler::Base
           # MS type: __int8,__int16 etc
           ct.left = get_extended_type(sym.current.get_inc!)
 
-      when 'C','D','E','F','G','H','I','J','K','M','N','O','X','Z'
+      when *SIMPLE_TYPES.keys
           # Simple data types
           ct.left = get_simple_type(dt)
           add_pmt = false
@@ -327,7 +326,7 @@ class Unmangler::MSVC < Unmangler::Base
           # not all the time is seems
           if in_args
               throw :done unless ptr = get_number(sym)
-              ct.left = sprintf("`template-parameter-%s'", ptr)
+              ct.left = "`template-parameter-#{ptr}'"
           else
               throw :done unless get_modified_type(ct, sym, pmt_ref, '?', in_args)
           end
@@ -559,27 +558,27 @@ class Unmangler::MSVC < Unmangler::Base
   def get_class(sym)
     name = nil
     while sym.current[0] != '@'
-        case (sym.current[0])
-        when "\0"; return false
-        when /\d/; name = sym.names[sym.current.get_inc!.to_i]
+        case sym.current[0]
+        when "\0",'',nil; return false
+        when /\d/;
+          # numbered backreference
+          name = sym.names[sym.current.get_inc!.to_i]
         when '?'
-            case sym.current.inc_get!
-            when '$'
-                sym.current.inc!
-                return false unless name = get_template_name(sym)
-                sym.names << name
-            when '?'
-                saved_stack, saved_names = sym.stack.dup, sym.names.dup
-                if symbol_demangle(sym)
-                  name = sprintf("`%s'", sym.result )
-                end
-                sym.stack, sym.names = saved_stack, saved_names
-            else
-                return false unless name = get_number(sym)
-                name = "`#{name}'"
-            end # case
+          case sym.current.inc_get!
+          when '$'
+            sym.current.inc!
+            return false unless name = get_template_name(sym)
+            sym.names << name
+          when '?'
+            saved_stack, saved_names = sym.stack.dup, sym.names.dup
+            name = "`#{sym.result}'" if symbol_demangle(sym)
+            sym.stack, sym.names = saved_stack, saved_names
+          else
+            return false unless name = get_number(sym)
+            name = "`#{name}'"
+          end # case
         else
-            name = get_literal_string(sym)
+          name = get_literal_string(sym)
         end # case
         return false unless name
         sym.stack << name
@@ -973,7 +972,7 @@ if $0 == __FILE__
       puts "[!] want: #{want.inspect.yellow}"
       puts "[!]  got: #{got.inspect.red}"
 #      pp u
-      exit 1
+#      exit 1
     end
   end
 
@@ -998,6 +997,9 @@ if $0 == __FILE__
 
   check "??$_Char_traits_cat@U?$char_traits@D@std@@@std@@YA?AU_Secure_char_traits_tag@0@XZ",
     "struct std::_Secure_char_traits_tag __cdecl std::_Char_traits_cat<struct std::char_traits<char> >(void)"
+
+  check "?dtor$0@?0???0CDockSite@@QEAA@XZ@4HA",
+    "int `public: __cdecl CDockSite::CDockSite(void) __ptr64'::`1'::dtor$1"
 
   # bad examples
   check "?ProcessAndDestroyEdit", :bad
