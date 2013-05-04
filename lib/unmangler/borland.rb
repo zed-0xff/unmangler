@@ -9,7 +9,7 @@ require 'unmangler/string_ptr'
 
 module Unmangler; end
 
-class Unmangler::Borland
+class Unmangler::Borland < Unmangler::Base
   attr_accessor :kind
 
   UM_UNKNOWN       = 0x00000000
@@ -631,23 +631,6 @@ class Unmangler::Borland
 
     assert(input() == TMPLCODE)
     advance()
-  end
-
-  def isdigit c
-    c =~ /\A\d\Z/
-  end
-
-  def assert cond
-    unless cond
-#      puts
-#      puts
-#      p @source
-#      p @source[0..-1]
-#      puts
-#      p @target
-#      puts
-      raise
-    end
   end
 
   def copy_name tmplname

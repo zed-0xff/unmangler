@@ -61,7 +61,11 @@ class StringPtr
   end
 
   def index needle
-    @string[@pos..-1].index(needle)
+    (@string[@pos..-1] || '').index(needle)
+  end
+
+  def strlen
+    (@string[@pos..-1] || '').bytesize
   end
 
   def =~ re
@@ -70,6 +74,23 @@ class StringPtr
 
   def inc!; @pos+=1; end
   def dec!; @pos-=1; end
+
+  # get current character and then increment
+  # like in C:
+  #   c = *p++
+  def get_inc!
+    c = @string[@pos]
+    @pos+=1
+    c
+  end
+
+  # increment and then get current character
+  # like in C:
+  #   c = *++p
+  def inc_get!
+    @pos+=1
+    @string[@pos]
+  end
 
   def trim!
     return unless @string

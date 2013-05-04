@@ -1,5 +1,7 @@
+require 'unmangler/base'
 require 'unmangler/version'
 require 'unmangler/borland'
+require 'unmangler/msvc'
 
 module Unmangler
   class << self
