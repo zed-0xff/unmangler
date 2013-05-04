@@ -77,6 +77,8 @@ class Unmangler::MSVC < Unmangler::Base
     do_after    = 0
     dashed_null = "--null--"
 
+    #printf "[d] in:  %s\n",  sym.current[0..-1]
+
     catch(:done) do
       # seems wrong as name, as it demangles a simple data type
       if sym.flags & UNDNAME_NO_ARGUMENTS != 0
@@ -280,6 +282,8 @@ class Unmangler::MSVC < Unmangler::Base
     else
       warn("Failed at %s\n", sym.current[0..-1])
     end
+
+    #printf "[d] out: %s\n", sym.result
 
     ret
   end
@@ -571,6 +575,7 @@ class Unmangler::MSVC < Unmangler::Base
             sym.names << name
           when '?'
             saved_stack, saved_names = sym.stack.dup, sym.names.dup
+            sym.stack = []
             name = "`#{sym.result}'" if symbol_demangle(sym)
             sym.stack, sym.names = saved_stack, saved_names
           else
@@ -969,6 +974,7 @@ if $0 == __FILE__
       print ".".green
     else
       puts
+      puts "[!]  src: #{src.inspect.gray}"
       puts "[!] want: #{want.inspect.yellow}"
       puts "[!]  got: #{got.inspect.red}"
 #      pp u
@@ -999,7 +1005,7 @@ if $0 == __FILE__
     "struct std::_Secure_char_traits_tag __cdecl std::_Char_traits_cat<struct std::char_traits<char> >(void)"
 
   check "?dtor$0@?0???0CDockSite@@QEAA@XZ@4HA",
-    "int `public: __cdecl CDockSite::CDockSite(void) __ptr64'::`1'::dtor$1"
+    "int `public: __cdecl CDockSite::CDockSite(void) __ptr64'::`1'::dtor$0"
 
   # bad examples
   check "?ProcessAndDestroyEdit", :bad
