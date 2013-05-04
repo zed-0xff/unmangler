@@ -807,8 +807,7 @@ class Unmangler::MSVC < Unmangler::Base
     saved_stack = sym.stack.dup
     array_pmt = []
 
-    # ZZZ ???
-    # sym.names.start = sym.names.num
+    sym.names = []
     return unless name = get_literal_string(sym)
     name << args if args = get_args(sym, array_pmt, false, '<', '>')
 
@@ -993,6 +992,9 @@ if $0 == __FILE__
 
   check "??0DNameStatusNode@@AEAA@W4DNameStatus@@@Z",
     "private: __cdecl DNameStatusNode::DNameStatusNode(enum DNameStatus) __ptr64"
+
+  check "?Add@?$CArray@VCSize@@V1@@@QAEHVCSize@@@Z",
+    "public: int __thiscall CArray<class CSize, class CSize>::Add(class CSize)"
 
   check "??$_Char_traits_cat@U?$char_traits@D@std@@@std@@YA?AU_Secure_char_traits_tag@0@XZ",
     "struct std::_Secure_char_traits_tag __cdecl std::_Char_traits_cat<struct std::char_traits<char> >(void)"
