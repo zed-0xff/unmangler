@@ -52,7 +52,7 @@ class Unmangler::MSVC < Unmangler::Base
     sym.flags   = flags
     sym.current = StringPtr.new(mangled)
 
-    symbol_demangle(sym) ? sym.result : mangled
+    symbol_demangle(sym) ? sym.result.strip : mangled
   end
 
   def self.unmangle *args
@@ -369,7 +369,7 @@ class Unmangler::MSVC < Unmangler::Base
           if (sym.current[0] == '4')
               sym.current.inc!
               throw :done unless enum_name = get_class_name(sym)
-              if (sym.flags & UNDNAME_NO_COMPLEX_TYPE)
+              if sym.flags & UNDNAME_NO_COMPLEX_TYPE != 0
                   ct.left = enum_name
               else
                   ct.left = sprintf("enum %s", enum_name)
@@ -990,6 +990,12 @@ if $0 == __FILE__
   check "?SetAt@CString@@QAEXHD@Z", "public: void __thiscall CString::SetAt(int, char)"
   check "?LoadFrame@CMDIFrameWndEx@@UAEHIKPAVCWnd@@PAUCCreateContext@@@Z",
     "public: virtual int __thiscall CMDIFrameWndEx::LoadFrame(unsigned int, unsigned long, class CWnd *, struct CCreateContext *)"
+
+  check "??0DNameStatusNode@@AEAA@W4DNameStatus@@@Z",
+    "private: __cdecl DNameStatusNode::DNameStatusNode(enum DNameStatus) __ptr64"
+
+  check "??$_Char_traits_cat@U?$char_traits@D@std@@@std@@YA?AU_Secure_char_traits_tag@0@XZ",
+    "struct std::_Secure_char_traits_tag __cdecl std::_Char_traits_cat<struct std::char_traits<char> >(void)"
 
   # bad examples
   check "?ProcessAndDestroyEdit", :bad
