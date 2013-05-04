@@ -776,12 +776,11 @@ class Unmangler::MSVC < Unmangler::Base
       return [open_char, "void", close_char].join
     end
 
-    args_str = arg_collect[1..-1].join(',')
+    args_str = arg_collect.join(', ')
+    # "...>>" => "...> >"
+    args_str << " " if close_char == '>' && args_str[-1] == '>'
 
-    last = (args_str && !args_str.empty?) ? args_str : arg_collect[0]
-
-    args_str << " " if close_char == '>' && last[-1] == '>'
-    [open_char, arg_collect[0], args_str, close_char].join
+    [open_char, args_str, close_char].join
   end # def get_args
 
 #  Wrapper around get_class and get_class_string.
@@ -971,10 +970,10 @@ if $0 == __FILE__
     if got == want
       print ".".green
     else
+      puts
       puts "[!] want: #{want.inspect.yellow}"
       puts "[!]  got: #{got.inspect.red}"
 #      pp u
-#      puts
       exit 1
     end
   end
@@ -987,6 +986,10 @@ if $0 == __FILE__
   check "?h@@YAXH@Z", "void __cdecl h(int)"
   check "?AFXSetTopLevelFrame@@YAXPAVCFrameWnd@@@Z", "void __cdecl AFXSetTopLevelFrame(class CFrameWnd *)"
   check "??0_Lockit@std@@QAE@XZ", "public: __thiscall std::_Lockit::_Lockit(void)"
+
+  check "?SetAt@CString@@QAEXHD@Z", "public: void __thiscall CString::SetAt(int, char)"
+  check "?LoadFrame@CMDIFrameWndEx@@UAEHIKPAVCWnd@@PAUCCreateContext@@@Z",
+    "public: virtual int __thiscall CMDIFrameWndEx::LoadFrame(unsigned int, unsigned long, class CWnd *, struct CCreateContext *)"
 
   # bad examples
   check "?ProcessAndDestroyEdit", :bad
