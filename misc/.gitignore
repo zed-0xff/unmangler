@@ -1,0 +1,5 @@
+*.txt
+*.msvc
+*.exe
+*.marshal
+*.yaml

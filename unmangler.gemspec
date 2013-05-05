@@ -12,7 +12,9 @@ Gem::Specification.new do |gem|
   gem.summary       = gem.description + %q{, i.e. '@myclass@func$qil' => 'myclass::func(int, long)'}
   gem.homepage      = "http://zed.0xff.me"
 
-  gem.files         = `git ls-files`.split($/).delete_if{ |x| x.end_with?(".bz2") }
+  gem.files         = `git ls-files`.split($/).
+    delete_if{ |x| x.end_with?(".bz2") || x.include?("misc/") }
+
   gem.executables   = gem.files.grep(%r{^bin/}).map{ |f| File.basename(f) }
   gem.test_files    = gem.files.grep(%r{^(test|spec|features)/})
   gem.require_paths = ["lib"]
