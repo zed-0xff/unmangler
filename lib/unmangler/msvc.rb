@@ -47,6 +47,11 @@ class Unmangler::MSVC < Unmangler::Base
   DataType = Struct.new :left, :right # char*
 
   def unmangle mangled, flags = UNDNAME_COMPLETE
+
+    if flags.is_a?(Hash)
+      flags = flags.fetch(:args, true) ? UNDNAME_COMPLETE : UNDNAME_NAME_ONLY
+    end
+
     if flags & UNDNAME_NAME_ONLY != 0
       flags |= UNDNAME_NO_FUNCTION_RETURNS | UNDNAME_NO_ACCESS_SPECIFIERS |
         UNDNAME_NO_MEMBER_TYPE | UNDNAME_NO_ALLOCATION_LANGUAGE | UNDNAME_NO_COMPLEX_TYPE
@@ -59,10 +64,6 @@ class Unmangler::MSVC < Unmangler::Base
     symbol_demangle(sym) ? sym.result.strip : mangled
   end
 
-  def self.unmangle *args
-    new.unmangle(*args)
-  end
-
   private
 
 #  def warn fmt, *args
@@ -70,10 +71,15 @@ class Unmangler::MSVC < Unmangler::Base
 #  end
 
   def err fmt, *args
-    STDERR.printf(fmt, *args)
-  rescue
-    STDERR.puts "[!] #{fmt.strip.inspect}, #{args.inspect}"
+    if @debug
+      begin
+        STDERR.printf(fmt, *args)
+      rescue
+        STDERR.puts "[!] #{fmt.strip.inspect}, #{args.inspect}"
+      end
+    end
   end
+
   alias :warn :err
 
   def symbol_demangle sym

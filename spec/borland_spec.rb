@@ -70,4 +70,6 @@ describe Unmangler::Borland do
   check "@Dbcommon@GetTableNameFromSQLEx$qqrx17System@WideString25Dbcommon@IDENTIFIEROption",
     "__fastcall Dbcommon::GetTableNameFromSQLEx(const System::WideString, Dbcommon::IDENTIFIEROption)"
 
+  check '@Classes@TThread@$bcdtr$qqrv',    '__fastcall Classes::TThread::`class destructor`()'
+  check '@Timespan@TTimeSpan@$bcctr$qqrv', '__fastcall Timespan::TTimeSpan::`class constructor`()'
 end
