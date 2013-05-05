@@ -1,3 +1,4 @@
+require 'unmangler/string_ptr'
 require 'unmangler/base'
 require 'unmangler/version'
 require 'unmangler/borland'

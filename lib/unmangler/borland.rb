@@ -1,6 +1,5 @@
 #!/usr/bin/env ruby
-
-require 'unmangler/string_ptr'
+require File.expand_path("base", File.dirname(__FILE__))
 
 # ported from Embarcadero RAD Studio XE3
 # $(BDS)\source\cpprtl\Source\misc\unmangle.c
@@ -86,6 +85,7 @@ class Unmangler::Borland < Unmangler::Base
   end
 
   def copy_char c
+    #puts "[d] copy_char #{c.inspect} from #{caller[0]}"
     @target[0] = (c == 0 ? "\x00" : c)
     @target.inc!
   end
@@ -542,7 +542,7 @@ class Unmangler::Borland < Unmangler::Base
       c = input()
 
       if (tmplargs && c == '$') # non-type template argument
-        termchar = 0
+        termchar = nil
         @target = start.dup
         c = advance()
         advance()
@@ -567,7 +567,7 @@ class Unmangler::Borland < Unmangler::Base
 
           when 'j','g','e'
             copy_until('$')
-            copy_char(termchar) if (termchar)
+            copy_char(termchar) if termchar
             break
 
           when 'm'
@@ -1004,6 +1004,9 @@ class Unmangler::Borland < Unmangler::Base
       @kind |= UM_QUALIFIED
     end
 
+    # trim unwanted result tail, if any
+    @target[0..-1] = ''
+
     # If the user wanted the qualifier and base name saved, then do it now.
 
     # TODO
@@ -1058,14 +1061,16 @@ end # class Unmangler
 ###################################################################
 
 if $0 == __FILE__
+  $:.unshift("./lib")
+  require 'unmangler/string_ptr'
   require 'awesome_print'
   require 'pp'
 
-  def check src, want, do_args = true
+  def check src, want, args = {}
     u = Unmangler::Borland.new
     got = nil
     begin
-      got = u.unmangle(src, do_args)
+      got = u.unmangle(src, args)
     rescue
       pp u
       raise
@@ -1073,12 +1078,19 @@ if $0 == __FILE__
     if got == want
       print ".".green
     else
-      puts "[!] want: #{want.inspect}"
-      puts "[!]  got: #{got.inspect}"
-      pp u
       puts
+      puts "[!]  src: #{src.inspect.gray}"
+      puts "[!] want: #{want.inspect.yellow}"
+      puts "[!]  got: #{got.inspect.red}"
+      puts
+      pp u
       exit 1
     end
+  end
+
+  if ARGV.any?
+    check ARGV[0], ARGV[1]
+    exit
   end
 
   check "@afunc$qxzcupi",   "afunc(const signed char, int *)"
@@ -1118,6 +1130,8 @@ if $0 == __FILE__
   check "@Dbcommon@GetTableNameFromSQLEx$qqrx17System@WideString25Dbcommon@IDENTIFIEROption",
     "__fastcall Dbcommon::GetTableNameFromSQLEx(const System::WideString, Dbcommon::IDENTIFIEROption)"
 
+  check "@$xt$p27System@%AnsiStringT$us$i0$%", "__tpdsc__ System::AnsiStringT<0> *"
+
 #  check "@Sysutils@Supports$qqrx45System@_DelphiInterface$t17System@IInterface_rx5_GUIDpv",
 #    "__fastcall Sysutils::Supports(const System::DelphiInterface<System::IInterface>, _GUID const &, void *)"
 
@@ -1127,11 +1141,11 @@ if $0 == __FILE__
 
   check "@Dbcommon@GetTableNameFromSQLEx$qqrx17System@WideString25Dbcommon@IDENTIFIEROption",
     "Dbcommon::GetTableNameFromSQLEx",
-    false
+    :args => false
 
   check "@std@%vector$51boost@archive@detail@basic_iarchive_impl@cobject_id69std@%allocator$51boost@archive@detail@basic_iarchive_impl@cobject_id%%@$bsubs$qui",
     "std::vector<boost::archive::detail::basic_iarchive_impl::cobject_id, std::allocator<boost::archive::detail::basic_iarchive_impl::cobject_id> >::operator []",
-    false
+    :args => false
 
   puts
 end

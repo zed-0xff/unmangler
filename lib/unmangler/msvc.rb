@@ -1,6 +1,10 @@
 #!/usr/bin/env ruby
 require File.expand_path("base", File.dirname(__FILE__))
 
+# ported from wine's undname.c
+#
+# most of the comments are from undname.c
+
 module Unmangler; end
 
 class Unmangler::MSVC < Unmangler::Base

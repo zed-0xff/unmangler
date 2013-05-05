@@ -115,6 +115,10 @@ class StringPtr
       @pos - x.pos
     end
   end
+
+  def inspect
+    "#<StringPtr @pos=#{@pos.inspect}: #{@string[@pos..-1].inspect}>"
+  end
 end
 
 if $0 == __FILE__
