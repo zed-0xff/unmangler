@@ -56,11 +56,6 @@ class Unmangler::Borland < Unmangler::Base
 
   MAXBUFFLEN = 8192 # maximum output length
 
-  # The mangler, when mangling argument types, will create
-  #   backreferences if the type has already been seen. These take the
-  #   form t?, where ? can be either 0-9, or a-z.
-
-
   # New mangle scheme lengths:
   #   len == 254 ==> old hash
   #   len == 253 ==> new MD5 hash
@@ -170,7 +165,7 @@ class Unmangler::Borland < Unmangler::Base
     #   string, it means the location of all the qualifier names is
     #   about to move.
 
-    unless [0,nil,false].include?(@adjust_quals)
+    if @adjust_quals
       @namebase += ret_len if @namebase
       @qualend  += ret_len if @qualend
       @prevqual += ret_len if @prevqual
@@ -182,13 +177,12 @@ class Unmangler::Borland < Unmangler::Base
   def copy_type(start, arglvl)
     start = start.dup if start.is_a?(StringPtr)
 
-    tname         = nil
+    tname = buff  = nil
     c             = input()
     is_const      = false
     is_volatile   = false
     is_signed     = false
     is_unsigned   = false
-    maxloop       = 101
     savedsavechar = nil
 
     arglvl =
@@ -197,6 +191,7 @@ class Unmangler::Borland < Unmangler::Base
       else true
       end
 
+    maxloop = 101
     loop do
       assert((maxloop-=1) > 0)
       case c
@@ -220,7 +215,7 @@ class Unmangler::Borland < Unmangler::Base
       i = 0
 
       begin      # compute length
-          i = i * 10 + (c.ord - '0'.ord)
+          i = i*10 + c.to_i
           c = advance()
       end while isdigit(c)
 
@@ -252,9 +247,8 @@ class Unmangler::Borland < Unmangler::Base
       advance()
       copy_type(@target, 0)
       len = @target - name
-      len = MAXBUFFLEN - 1 if (len > MAXBUFFLEN - 1)
-      strncpy(buff, name, len)
-      buff[len] = 0
+      #len = MAXBUFFLEN - 1 if (len > MAXBUFFLEN - 1)
+      buff = name[0,len]
       @target = name
     end
 
@@ -274,18 +268,17 @@ class Unmangler::Borland < Unmangler::Base
 
     when 'C'      # C++ wide char
       c = advance()
-      if (c == 's')
+      if c == 's'
         tname = "char16_t"
-      elsif (c == 'i')
+      elsif c == 'i'
         tname = "char32_t"
       else
-        raise "Unknown type"
+        raise "Unknown wide char type: 'C#{c}'"
       end
 
     when 'M','r','h','p' # member pointer, reference, rvalue reference, pointer
       if (@savechar == 'M')
-        c = input()  # [BTS-??????]
-        case c
+        case c = input()  # [BTS-??????]
         when 'x'; is_const = true; c = advance()    # [BCB-272500]
         when 'w'; is_volatile = true; c = advance()
         end
@@ -315,7 +308,7 @@ class Unmangler::Borland < Unmangler::Base
       when 'h'; append('&&')
       when 'p'; append(' *')
       when 'M'
-        assert(buff[0])
+        assert(buff)
         copy_char(' ')
         copy_string(buff)
         append '::*'
@@ -363,7 +356,7 @@ class Unmangler::Borland < Unmangler::Base
       end
 
       save_adjqual = @adjust_quals
-      @adjust_quals = 0
+      @adjust_quals = false
 
       copy_char('(')
       copy_args('$', 0)
@@ -403,7 +396,7 @@ class Unmangler::Borland < Unmangler::Base
   def copy_delphi4args(_end, tmplargs)
     first = true
     _begin = start = nil
-    termchar = 0
+    termchar = nil
 
     tmplargs =
       case tmplargs
@@ -438,11 +431,7 @@ class Unmangler::Borland < Unmangler::Base
 
         when 'i'
           if _begin[0,5] == '4bool'
-            if input() == '0'
-                copy_string("false")
-            else
-                copy_string("true")
-            end
+            copy_string( input() == '0' ? "false" : "true" )
             advance()
             break
           else
@@ -482,13 +471,16 @@ class Unmangler::Borland < Unmangler::Base
     end # while c && c != _end
   end
 
-  PEntry = Struct.new :targpos, :len
+  # The mangler, when mangling argument types, will create
+  # backreferences if the type has already been seen. These take the
+  # form t?, where ? can be either 0-9, or a-z.
+  PEntry = Struct.new :start, :len
 
   def copy_args(_end, tmplargs)
     c = input()
     first = true
     _begin = start = nil
-    scanned = 0
+    scanned = false
     param_table = []
 
     tmplargs =
@@ -497,7 +489,7 @@ class Unmangler::Borland < Unmangler::Base
       else true
       end
 
-    while (c && c != _end)
+    while c && ![0, "\0", _end].include?(c)
       if first
         first = false
       else
@@ -507,37 +499,35 @@ class Unmangler::Borland < Unmangler::Base
       _begin   = @source.dup
       start    = @target.dup
 
-      param_table << PEntry.new
-      param_table.last.targpos = @target.dup
+      param_table << PEntry.new( @target.dup )
+      scanned = false
 
-      scanned = 0
-
-      while (c == 'x' || c == 'w')
+      while c == 'x' || c == 'w'
         # Decode 'const'/'volatile' modifiers [BCB-265738]
         case c
         when 'x'; copy_string("const ")
         when 'w'; copy_string("volatile ")
         end
-        scanned = 1
+        scanned = true
         c = advance()
       end
 
-      if (scanned && c != 't')
+      if scanned && c != 't'
         @source = _begin.dup
       end
 
-      if (c != 't')
-        copy_type(@target, ! tmplargs)
-      else
+      if c == 't'
         c = advance()
-        ptindex = c.to_i(16) - 1
-        assert(param_table[ptindex].targpos)
+        ptindex = c.to_i(36) - 1
+        assert(param_table[ptindex].start)
         assert(param_table[ptindex].len > 0)
-        copy_string param_table[ptindex].targpos[0, param_table[ptindex].len]
+        copy_string param_table[ptindex].start[0, param_table[ptindex].len]
         advance()
+      else
+        copy_type(@target, ! tmplargs)
       end
 
-      param_table.last.len = @target - param_table.last.targpos
+      param_table.last.len = @target - param_table.last.start
 
       c = input()
 
@@ -555,11 +545,7 @@ class Unmangler::Borland < Unmangler::Base
 
           when 'i'
             if _begin[0,5] == "4bool"
-              if (input() == '0')
-                copy_string("false")
-              else
-                copy_string("true")
-              end
+              copy_string( input() == '0' ? "false" : "true" )
               advance()
               break
             end
@@ -615,7 +601,7 @@ class Unmangler::Borland < Unmangler::Base
     # name from a template argument, for example.
 
     save_setqual = @set_qual
-    @set_qual = 0
+    @set_qual = false
 
     if isDelphi4name
       copy_delphi4args(TMPLCODE, 1)
@@ -636,6 +622,12 @@ class Unmangler::Borland < Unmangler::Base
   def copy_name tmplname
     start = save_setqual = nil
     c = input()
+
+    tmplname =
+      case tmplname
+      when 0, nil, false; false
+      else true
+      end
 
     # Start outputting the qualifier names and the base name.
 
@@ -698,7 +690,7 @@ class Unmangler::Borland < Unmangler::Base
           end
 
         when ARGLIST    # special name, or arglist
-          return unless [0,nil,false].include?(tmplname)
+          return if tmplname
 
           c = advance()
           if c == 'x'
@@ -749,7 +741,7 @@ class Unmangler::Borland < Unmangler::Base
             advance()
             copy_string("operator ")
             save_setqual = @set_qual
-            @set_qual = 0
+            @set_qual = false
             copy_type(@target, 0)
             @set_qual = save_setqual
             assert(input() == ARGLIST)
@@ -885,7 +877,12 @@ class Unmangler::Borland < Unmangler::Base
   #     will be unmangled, and not the arguments.
 
   def unmangle src, args = {}
+    # all Borland mangled names start with '@' character.
     return src if !src || src.empty? || src[0] != '@'
+
+    # check for Microsoft compatible fastcall names, which are of the form:
+    # @funcName@<one or more digits indicating size of all parameters>
+    return src if src =~ /\A@.*@\d+\Z/
 
     # unmangle args? defaulting to true
     doArgs = args.fetch(:args, true)
@@ -910,21 +907,16 @@ class Unmangler::Borland < Unmangler::Base
 
     @savechar = 0
 
-    # All mangled names start with '@' character.
-
     src = src[1..-1] # skip initial '@'
 
-    # check for Microsoft compatible fastcall names, which are of the form:
-    # @funcName@<one or more digits indicating size of all parameters>
-    return src if src =~ /\A@.*@\d+\Z/
-
-    if src[/[a-z]/]
-      # contains lowercase letters => not Pascal
-      # b/c Pascal names can not contain lowercase letters
-    else
-      # Pascal, convert uppercase Pascal names to lowercase
-      src.downcase!
-    end
+# ZZZ XXX not sure if it's needed now
+#    if src[/[a-z]/]
+#      # contains lowercase letters => not Pascal
+#      # b/c Pascal names can not contain lowercase letters
+#    else
+#      # Pascal, convert uppercase Pascal names to lowercase
+#      src.downcase!
+#    end
 
     # This is at LEAST a member name, if not a fully mangled template
     # or function name. So, begin outputting the subnames. We set up
@@ -935,14 +927,14 @@ class Unmangler::Borland < Unmangler::Base
     @source_string = src
     @source    = StringPtr.new(@source_string)
     @prevqual  = @qualend = @base_name = @base_end = nil
-    @set_qual  = 1
+    @set_qual  = true
 
     # Start outputting the qualifier names and the base name.
 
     @namebase = @target.dup
 
     copy_name(0)
-    @set_qual = 0
+    @set_qual = false
     @base_end = @target.dup
 
     if (@kind & UM_KINDMASK) == UM_TPDSC || (@kind & UM_SPECMASK) != 0
@@ -951,25 +943,17 @@ class Unmangler::Borland < Unmangler::Base
       @namebase = p + 1
     end
 
-    if (@kind & UM_KINDMASK) == UM_CONSTRUCTOR || (@kind & UM_KINDMASK) == UM_DESTRUCTOR
-      start = nil
+    if [UM_CONSTRUCTOR,UM_DESTRUCTOR].include?( @kind & UM_KINDMASK )
+      copy_char('~') if @kind & UM_KINDMASK == UM_DESTRUCTOR
 
-      if (@kind & UM_KINDMASK) == UM_DESTRUCTOR
-        copy_char('~')
-      end
-
-      if !@qualend
+      if @qualend
+        start = @prevqual ? (@prevqual+2) : @namebase.dup
+        len = @qualend - start
+        copy_string(start, len)
+      else
         # It's a bcc-created static constructor??
         # give it a name.
         copy_string("unknown")
-      else
-        if !@prevqual
-            start = @namebase.dup
-        else
-            start = @prevqual + 2
-        end
-        len = @qualend - start
-        copy_string(start, len)
       end
     end
 
@@ -983,8 +967,8 @@ class Unmangler::Borland < Unmangler::Base
       # Output the function parameters, and return type in the case
       #   of template function specializations.
 
-      @set_qual = 0
-      @adjust_quals = 1
+      @set_qual = false
+      @adjust_quals = true
 
       copy_type(@namebase, 0)
 
@@ -1131,6 +1115,12 @@ if $0 == __FILE__
     "__fastcall Dbcommon::GetTableNameFromSQLEx(const System::WideString, Dbcommon::IDENTIFIEROption)"
 
   check "@$xt$p27System@%AnsiStringT$us$i0$%", "__tpdsc__ System::AnsiStringT<0> *"
+
+  check "@Adomcore_4_3@TDomNamedNodeMap@$bctr$qqrpx21Adomcore_4_3@TDomNodepx13Classes@TListx54System@%Set$t25Adomcore_4_3@TDomNodeType$iuc$0$iuc$11%xo",
+    "__fastcall Adomcore_4_3::TDomNamedNodeMap::TDomNamedNodeMap(Adomcore_4_3::TDomNode *, Classes::TList *, const System::Set<Adomcore_4_3::TDomNodeType, 0, 11>, const bool)"
+
+  check '@ATL@%CComObjectRootEx$25ATL@CComSingleThreadModel%@$bctr$qv',
+    "ATL::CComObjectRootEx<ATL::CComSingleThreadModel>::CComObjectRootEx<ATL::CComSingleThreadModel>()"
 
 #  check "@Sysutils@Supports$qqrx45System@_DelphiInterface$t17System@IInterface_rx5_GUIDpv",
 #    "__fastcall Sysutils::Supports(const System::DelphiInterface<System::IInterface>, _GUID const &, void *)"
