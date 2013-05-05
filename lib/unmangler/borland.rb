@@ -126,11 +126,13 @@ class Unmangler::Borland < Unmangler::Base
     "rand"=> "&=", "rdiv"=> "/=", "rlsh"=> "<<=","rmin"=> "-=", "rmod"=> "%=",
     "rmul"=> "*=", "ror" => "|=", "rplu"=> "+=", "rrsh"=> ">>=","rsh" => ">>",
     "rxor"=> "^=", "subs"=> "[]", "sub" => "-",  "xor" => "^",  "arow"=> "->",
-    "nwa" => "new[]", "dele"=> "delete", "dla" => "delete[]"
+    "nwa" => "new[]", "dele"=> "delete", "dla" => "delete[]",
+    # not in unmangle.c, but from IDA
+    "cctr" => "`class constructor`", "cdtr" => "`class destructor`"
   }
 
   def copy_op src
-    copy_string(OPS[src] || src)
+    copy_string(OPS[src] || "?#{src}?")
   end
 
   def copy_return_type(start, callconv, regconv, process_return)
@@ -1022,6 +1024,11 @@ class Unmangler::Borland < Unmangler::Base
       @result.sub! /\A__tpdsc__ /,''
     end
 
+    # copy IDA syntax for class ctor/dtor:
+    #   was: Classes::TThread::operator `class destructor`()
+    #   now: Classes::TThread::`class destructor`()
+    @result.sub! '::operator `class', '::`class'
+
     @result
   end
 
@@ -1122,8 +1129,8 @@ if $0 == __FILE__
   check '@ATL@%CComObjectRootEx$25ATL@CComSingleThreadModel%@$bctr$qv',
     "ATL::CComObjectRootEx<ATL::CComSingleThreadModel>::CComObjectRootEx<ATL::CComSingleThreadModel>()"
 
-#  check "@Sysutils@Supports$qqrx45System@_DelphiInterface$t17System@IInterface_rx5_GUIDpv",
-#    "__fastcall Sysutils::Supports(const System::DelphiInterface<System::IInterface>, _GUID const &, void *)"
+  check '@Classes@TThread@$bcdtr$qqrv',    '__fastcall Classes::TThread::`class destructor`()'
+  check '@Timespan@TTimeSpan@$bcctr$qqrv', '__fastcall Timespan::TTimeSpan::`class constructor`()'
 
   ####################################
   # w/o args
